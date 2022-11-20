@@ -89,6 +89,7 @@ class AIHUB(BaseImageDataset):
             if relabel:
                 pid = pid2label[pid]
                 cid = cid2label[cid]
-            dataset.append((img_path, pid, cid))
+            attribute = []
+            dataset.append((img_path, pid, cid, attribute))
 
         return dataset

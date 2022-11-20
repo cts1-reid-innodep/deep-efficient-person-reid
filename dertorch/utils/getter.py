@@ -175,19 +175,19 @@ def get_dataset_and_dataloader(config):
                            root=config.root_dir)
 
     num_classes = dataset.num_train_pids
-    train_set = ImageDataset(dataset.train, train_transforms)
+    train_set = ImageDataset(dataset.train, train_transforms, attr_lens=config.attr_lens)
 
-    if config.sampler == 'softmax':
-        train_loader = DataLoader(
-            train_set, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=train_collate_fn)
-    else:
-        train_loader = DataLoader(
-            train_set, batch_size=config.batch_size,
-            sampler=RandomIdentitySampler(
-                dataset.train, config.batch_size, config.num_instance),
-            # sampler=RandomIdentitySampler_alignedreid(dataset.train, config.num_instance),
-            num_workers=config.num_workers, collate_fn=train_collate_fn
-        )
+    # if config.sampler == 'softmax':
+    train_loader = DataLoader(
+        train_set, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=train_collate_fn)
+    # else:
+    #     train_loader = DataLoader(
+    #         train_set, batch_size=config.batch_size,
+    #         sampler=RandomIdentitySampler(
+    #             dataset.train, config.batch_size, config.num_instance),
+    #         # sampler=RandomIdentitySampler_alignedreid(dataset.train, config.num_instance),
+    #         num_workers=config.num_workers, collate_fn=train_collate_fn
+    #     )
 
     val_set = ImageDataset(dataset.query + dataset.gallery, val_transforms)
     val_loader = DataLoader(
@@ -196,3 +196,23 @@ def get_dataset_and_dataloader(config):
     )
 
     return train_loader, val_loader, len(dataset.query), num_classes
+
+class AverageMeter(object):
+    """Computes and stores the average and current value.
+       
+       Code imported from https://github.com/pytorch/examples/blob/master/imagenet/main.py#L247-L262
+    """
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.val = 0
+        self.avg = 0
+        self.sum = 0
+        self.count = 0
+
+    def update(self, val, n=1):
+        self.val = val
+        self.sum += val * n
+        self.count += n
+        self.avg = self.sum / self.count

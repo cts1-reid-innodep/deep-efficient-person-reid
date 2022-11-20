@@ -1,6 +1,8 @@
 from .center import *
 from .triplet import *
 from .arcface import *
+from .attribute import *
+
 
 import torch.nn.functional as F
 
@@ -10,6 +12,10 @@ def make_loss(config, num_classes):    # modified by gu
     sampler = config.sampler
     if config.loss_type == 'triplet':
         triplet = TripletLoss(config.margin)  # triplet loss
+    elif config.loss_type == 'triplet_attr':
+        triplet = TripletLoss(config.margin)
+        attrweight = TripletLossAttrWeightes(margin=config.margin, dis_type="euclid")
+
     else:
         print('expected METRIC_LOSS_TYPE should be triplet'
               'but got {}'.format(config.loss_type))
@@ -20,18 +26,23 @@ def make_loss(config, num_classes):    # modified by gu
         print("label smooth on, numclasses:", num_classes)
 
     if sampler == 'softmax':
-        def loss_func(score, feat, target):
+        def loss_func(score, feat, target, index, attr=[]):
             return F.cross_entropy(score, target)
     elif config.sampler == 'triplet':
-        def loss_func(score, feat, target):
-            return triplet(feat, target)[0]
+        def loss_func(score, feat, target, index, attr=[]):
+            return triplet(feat[index], target[index])[0]
     elif config.sampler == 'softmax_triplet':
-        def loss_func(score, feat, target):
+        def loss_func(score, feat, target, index=None, attr=[]):
             if config.loss_type == 'triplet':
                 if config.label_smooth == 'on':
                     return xent(score, target) + triplet(feat, target)[0]
                 else:
                     return F.cross_entropy(score, target) + triplet(feat, target)[0]
+            elif config.loss_type == 'triplet_attr':
+                if config.label_smooth == 'on':
+                    return xent(score, target) + triplet(feat, target)[0] + attrweight(feat, target, attr)
+                else:
+                    return F.cross_entropy(score, target) + triplet(feat, target)[0] + attrweight(feat, target, attr)
             else:
                 print('expected METRIC_LOSS_TYPE should be triplet'
                       'but got {}'.format(config.loss_type))
