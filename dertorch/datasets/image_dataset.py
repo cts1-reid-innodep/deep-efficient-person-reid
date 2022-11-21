@@ -32,7 +32,7 @@ class ImageDataset(Dataset):
         return len(self.dataset)
 
     def __getitem__(self, index):
-        img_path, pid, camid, attr = self.dataset[index]
+        img_path, pid, camid, attrs = self.dataset[index]
         attributes = []
         img = read_image(img_path)
 

@@ -11,21 +11,13 @@ torch.backends.cudnn.fastest = True
 
 def train(config):
 
-    train_transforms = build_transforms(config, is_train=True)
-    dataset_reference = init_dataset(config.dataset_names + '_origin',
-                           root=config.root_dir)
-    train_set_reference = ImageDataset(dataset_reference.train, train_transforms)
-    # if config.sampler == 'softmax':
-    train_loader_reference = DataLoader(
-        train_set_reference, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=train_collate_fn)
-    # else:
-    #     train_loader_reference = DataLoader(
-    #         train_set_reference, batch_size=config.batch_size,
-    #         sampler=RandomIdentitySampler(
-    #             dataset_reference.train, config.batch_size, config.num_instance),
-    #         # sampler=RandomIdentitySampler_alignedreid(dataset.train, config.num_instance),
-    #         num_workers=config.num_workers, collate_fn=train_collate_fn
-    #     )
+    if config.oneshot_learning == 'yes':
+        train_transforms = build_transforms(config, is_train=True)
+        dataset_reference = init_dataset(config.dataset_names + '_origin',
+                            root=config.root_dir)
+        train_set_reference = ImageDataset(dataset_reference.train, train_transforms)
+        train_loader_reference = DataLoader(
+            train_set_reference, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=train_collate_fn)
 
     # prepare dataset
     train_loader, val_loader, num_query, num_classes = get_dataset_and_dataloader(
@@ -57,21 +49,33 @@ def train(config):
             scheduler = WarmupMultiStepLR(optimizer, config.steps, config.gamma, config.warmup_factor,
                                           config.warmup_iters, config.warmup_method, start_epoch)
 
-
-        do_train(
-            config,
-            model,
-            train_loader,
-            val_loader,
-            optimizer,
-            scheduler,      # modify for using self trained model
-            loss_func,
-            num_query,
-            start_epoch,     # add for using self trained model
-            dataset_reference,
-            train_loader_reference,
-            num_classes
-        )
+        if config.oneshot_learning == 'yes':
+            do_oneshot_train(
+                config,
+                model,
+                train_loader,
+                val_loader,
+                optimizer,
+                scheduler,      # modify for using self trained model
+                loss_func,
+                num_query,
+                start_epoch,     # add for using self trained model
+                dataset_reference,
+                train_loader_reference,
+                num_classes
+            )
+        else:
+            do_train(
+                config,
+                model,
+                train_loader,
+                val_loader,
+                optimizer,
+                scheduler,
+                loss_func,
+                num_query,
+                start_epoch
+            )
 
     elif config.if_with_center == 'yes':
         print('Train with center loss, the loss type is',
@@ -109,19 +113,37 @@ def train(config):
             scheduler = WarmupMultiStepLR(optimizer, config.steps, config.gamma, config.warmup_factor,
                                           config.warmup_iters, config.warmup_method, start_epoch)
 
-        do_train_with_center(
-            config,
-            model,
-            center_criterion,
-            train_loader,
-            val_loader,
-            optimizer,
-            optimizer_center,
-            scheduler,      # modify for using self trained model
-            loss_func,
-            num_query,
-            start_epoch     # add for using self trained model
-        )
+        if config.oneshot_learning == 'yes':
+            do_oneshot_train_with_center(
+                config,
+                model,
+                center_criterion,
+                train_loader,
+                val_loader,
+                optimizer,
+                optimizer_center,
+                scheduler,
+                loss_func,
+                num_query,
+                start_epoch,
+                dataset_reference,
+                train_loader_reference,
+                num_classes
+            )
+        else:
+            do_train_with_center(
+                config,
+                model,
+                center_criterion,
+                train_loader,
+                val_loader,
+                optimizer,
+                optimizer_center,
+                scheduler,      # modify for using self trained model
+                loss_func,
+                num_query,
+                start_epoch     # add for using self trained model
+            )
     else:
         print("Unsupported value for config.MODEL.IF_WITH_CENTER {}, only support yes or no!\n".format(
             config.if_with_center))

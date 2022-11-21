@@ -171,23 +171,29 @@ def get_dataset_and_dataloader(config):
     train_transforms = build_transforms(config, is_train=True)
     val_transforms = build_transforms(config, is_train=False)
 
-    dataset = init_dataset(config.dataset_names,
+    if config.oneshot_learning == 'yes':
+        dataset = init_dataset(config.dataset_names,
                            root=config.root_dir)
-
-    num_classes = dataset.num_train_pids
-    train_set = ImageDataset(dataset.train, train_transforms, attr_lens=config.attr_lens)
-
-    # if config.sampler == 'softmax':
-    train_loader = DataLoader(
-        train_set, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=train_collate_fn)
-    # else:
-    #     train_loader = DataLoader(
-    #         train_set, batch_size=config.batch_size,
-    #         sampler=RandomIdentitySampler(
-    #             dataset.train, config.batch_size, config.num_instance),
-    #         # sampler=RandomIdentitySampler_alignedreid(dataset.train, config.num_instance),
-    #         num_workers=config.num_workers, collate_fn=train_collate_fn
-    #     )
+        num_classes = dataset.num_train_pids
+        train_set = ImageDataset(dataset.train, train_transforms, attr_lens=config.attr_lens)
+        train_loader = DataLoader(
+            train_set, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=train_collate_fn)
+    else:
+        dataset = init_dataset(config.dataset_names + '_origin',
+                           root=config.root_dir)
+        num_classes = dataset.num_train_pids
+        train_set = ImageDataset(dataset.train, train_transforms, attr_lens=config.attr_lens)
+        if config.sampler == 'softmax':
+            train_loader = DataLoader(
+                train_set, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=train_collate_fn)
+        else:
+            train_loader = DataLoader(
+                train_set, batch_size=config.batch_size,
+                sampler=RandomIdentitySampler(
+                    dataset.train, config.batch_size, config.num_instance),
+                # sampler=RandomIdentitySampler_alignedreid(dataset.train, config.num_instance),
+                num_workers=config.num_workers, collate_fn=train_collate_fn
+            )
 
     val_set = ImageDataset(dataset.query + dataset.gallery, val_transforms)
     val_loader = DataLoader(

@@ -26,119 +26,6 @@ from typing import Callable, Optional
 global ITER
 ITER = 0
 
-class _Loss(Module):
-    reduction: str
-
-    def __init__(self, size_average=None, reduce=None, reduction: str = 'mean') -> None:
-        super(_Loss, self).__init__()
-        if size_average is not None or reduce is not None:
-            self.reduction: str = _Reduction.legacy_get_string(size_average, reduce)
-        else:
-            self.reduction = reduction
-
-class BCEWithLogitsLoss(_Loss):
-    r"""This loss combines a `Sigmoid` layer and the `BCELoss` in one single
-    class. This version is more numerically stable than using a plain `Sigmoid`
-    followed by a `BCELoss` as, by combining the operations into one layer,
-    we take advantage of the log-sum-exp trick for numerical stability.
-
-    The unreduced (i.e. with :attr:`reduction` set to ``'none'``) loss can be described as:
-
-    .. math::
-        \ell(x, y) = L = \{l_1,\dots,l_N\}^\top, \quad
-        l_n = - w_n \left[ y_n \cdot \log \sigma(x_n)
-        + (1 - y_n) \cdot \log (1 - \sigma(x_n)) \right],
-
-    where :math:`N` is the batch size. If :attr:`reduction` is not ``'none'``
-    (default ``'mean'``), then
-
-    .. math::
-        \ell(x, y) = \begin{cases}
-            \operatorname{mean}(L), & \text{if reduction} = \text{`mean';}\\
-            \operatorname{sum}(L),  & \text{if reduction} = \text{`sum'.}
-        \end{cases}
-
-    This is used for measuring the error of a reconstruction in for example
-    an auto-encoder. Note that the targets `t[i]` should be numbers
-    between 0 and 1.
-
-    It's possible to trade off recall and precision by adding weights to positive examples.
-    In the case of multi-label classification the loss can be described as:
-
-    .. math::
-        \ell_c(x, y) = L_c = \{l_{1,c},\dots,l_{N,c}\}^\top, \quad
-        l_{n,c} = - w_{n,c} \left[ p_c y_{n,c} \cdot \log \sigma(x_{n,c})
-        + (1 - y_{n,c}) \cdot \log (1 - \sigma(x_{n,c})) \right],
-
-    where :math:`c` is the class number (:math:`c > 1` for multi-label binary classification,
-    :math:`c = 1` for single-label binary classification),
-    :math:`n` is the number of the sample in the batch and
-    :math:`p_c` is the weight of the positive answer for the class :math:`c`.
-
-    :math:`p_c > 1` increases the recall, :math:`p_c < 1` increases the precision.
-
-    For example, if a dataset contains 100 positive and 300 negative examples of a single class,
-    then `pos_weight` for the class should be equal to :math:`\frac{300}{100}=3`.
-    The loss would act as if the dataset contains :math:`3\times 100=300` positive examples.
-
-    Examples::
-
-        >>> target = torch.ones([10, 64], dtype=torch.float32)  # 64 classes, batch size = 10
-        >>> output = torch.full([10, 64], 1.5)  # A prediction (logit)
-        >>> pos_weight = torch.ones([64])  # All weights are equal to 1
-        >>> criterion = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)
-        >>> criterion(output, target)  # -log(sigmoid(1.5))
-        tensor(0.2014)
-
-    Args:
-        weight (Tensor, optional): a manual rescaling weight given to the loss
-            of each batch element. If given, has to be a Tensor of size `nbatch`.
-        size_average (bool, optional): Deprecated (see :attr:`reduction`). By default,
-            the losses are averaged over each loss element in the batch. Note that for
-            some losses, there are multiple elements per sample. If the field :attr:`size_average`
-            is set to ``False``, the losses are instead summed for each minibatch. Ignored
-            when :attr:`reduce` is ``False``. Default: ``True``
-        reduce (bool, optional): Deprecated (see :attr:`reduction`). By default, the
-            losses are averaged or summed over observations for each minibatch depending
-            on :attr:`size_average`. When :attr:`reduce` is ``False``, returns a loss per
-            batch element instead and ignores :attr:`size_average`. Default: ``True``
-        reduction (string, optional): Specifies the reduction to apply to the output:
-            ``'none'`` | ``'mean'`` | ``'sum'``. ``'none'``: no reduction will be applied,
-            ``'mean'``: the sum of the output will be divided by the number of
-            elements in the output, ``'sum'``: the output will be summed. Note: :attr:`size_average`
-            and :attr:`reduce` are in the process of being deprecated, and in the meantime,
-            specifying either of those two args will override :attr:`reduction`. Default: ``'mean'``
-        pos_weight (Tensor, optional): a weight of positive examples.
-                Must be a vector with length equal to the number of classes.
-
-    Shape:
-        - Input: :math:`(*)`, where :math:`*` means any number of dimensions.
-        - Target: :math:`(*)`, same shape as the input.
-        - Output: scalar. If :attr:`reduction` is ``'none'``, then :math:`(*)`, same
-          shape as input.
-
-     Examples::
-
-        >>> loss = nn.BCEWithLogitsLoss()
-        >>> input = torch.randn(3, requires_grad=True)
-        >>> target = torch.empty(3).random_(2)
-        >>> output = loss(input, target)
-        >>> output.backward()
-    """
-    def __init__(self, weight: Optional[Tensor] = None, size_average=None, reduce=None, reduction: str = 'mean',
-                 pos_weight: Optional[Tensor] = None) -> None:
-        super(BCEWithLogitsLoss, self).__init__(size_average, reduce, reduction)
-        self.register_buffer('weight', weight)
-        self.register_buffer('pos_weight', pos_weight)
-        self.weight: Optional[Tensor]
-        self.pos_weight: Optional[Tensor]
-
-    def forward(self, input: Tensor, target: Tensor) -> Tensor:
-        return F.binary_cross_entropy_with_logits(input, target,
-                                                  self.weight,
-                                                  pos_weight=self.pos_weight,
-                                                  reduction=self.reduction)
-
 def create_supervised_trainer(config, model, optimizer, loss_fn,
                               device=None):
     """
@@ -159,17 +46,25 @@ def create_supervised_trainer(config, model, optimizer, loss_fn,
 
     def _update(engine, batch):
         model.train()
-        img, target, img_path = batch
+        img, target, _, attrs = batch
         img = img.to(device) if torch.cuda.device_count() >= 1 else img
         target = target.to(
             device) if torch.cuda.device_count() >= 1 else target
-        score, feat = model(img)
+        score, feat, attr = model(img)
 
         with torch.cuda.amp.autocast(enabled=config.mixed_precision):
             amp_scale = torch.cuda.amp.GradScaler()
             loss = loss_fn(score, feat, target)
             # print("Total loss is {}".format(
             #     loss))
+
+        if len(config.attr_lens) != 0:
+            attrs = [a[0].cuda() for a in attrs]
+            attr_criter = BCEWithLogitsLoss()
+            attr_loss = attr_criter(attr[0][0], attrs[0])
+            for i in range(1, len(attrs)):
+                attr_loss += attr_criter(attr[0][i], attrs[i])
+            loss += attr_loss
 
         if config.mixed_precision:
             optimizer.zero_grad()
@@ -199,17 +94,25 @@ def create_supervised_trainer_with_center(config, model, center_criterion, optim
         model.train()
         optimizer.zero_grad()
         optimizer_center.zero_grad()
-        img, target = batch
+        img, target, _, attrs = batch
         img = img.to(device) if torch.cuda.device_count() >= 1 else img
         target = target.to(
             device) if torch.cuda.device_count() >= 1 else target
-        score, feat = model(img)
+        score, feat, attr = model(img)
 
         with torch.cuda.amp.autocast(enabled=config.mixed_precision):
             amp_scale = torch.cuda.amp.GradScaler()
-            loss = loss_fn(score, feat, target)
+            loss = loss_fn(score, feat, target, attr=attr)
             # print("Total loss is {}, center loss is {}".format(
             #     loss, center_criterion(feat, target)))
+
+        if len(config.attr_lens) != 0:
+            attrs = [a[0].cuda() for a in attrs]
+            attr_criter = BCEWithLogitsLoss()
+            attr_loss = attr_criter(attr[0][0], attrs[0])
+            for i in range(1, len(attrs)):
+                attr_loss += attr_criter(attr[0][i], attrs[i])
+            loss += attr_loss
 
         if config.mixed_precision:
             optimizer.zero_grad()
@@ -258,7 +161,7 @@ def create_supervised_evaluator(model, metrics,
         with torch.no_grad():
             data, pids, camids, _ = batch
             data = data.to(device) if torch.cuda.device_count() >= 1 else data
-            feat = model(data)
+            feat, _ = model(data)
 
             return feat, pids, camids
 
@@ -269,8 +172,89 @@ def create_supervised_evaluator(model, metrics,
 
     return engine
 
-
 def do_train(
+        config,
+        model,
+        train_loader,
+        val_loader,
+        optimizer,
+        scheduler,
+        loss_fn,
+        num_query,
+        start_epoch
+):
+    log_period = config.log_period
+    checkpoint_period = config.checkpoint_period
+    eval_period = config.eval_period
+    output_dir = config.output_dir
+    device = config.device
+    epochs = config.num_epochs
+
+    logger = logging.getLogger("reid_baseline.train")
+    logger.info("Start training")
+    trainer = create_supervised_trainer(
+        config, model, optimizer, loss_fn, device=device)
+    evaluator = create_supervised_evaluator(model, metrics={'r1_mAP': R1_mAP(
+        num_query, max_rank=50, feat_norm=config.test_feat_norm)}, device=device)
+    checkpointer = ModelCheckpoint(
+        output_dir, config.model_name, checkpoint_period, n_saved=10, require_empty=False)
+    timer = Timer(average=True)
+
+    trainer.add_event_handler(Events.EPOCH_COMPLETED, checkpointer, {'model': model,
+                                                                     'optimizer': optimizer})
+    timer.attach(trainer, start=Events.EPOCH_STARTED, resume=Events.ITERATION_STARTED,
+                 pause=Events.ITERATION_COMPLETED, step=Events.ITERATION_COMPLETED)
+
+    # average metric to attach on trainer
+    RunningAverage(output_transform=lambda x: x[0]).attach(trainer, 'avg_loss')
+    RunningAverage(output_transform=lambda x: x[1]).attach(trainer, 'avg_acc')
+
+    @trainer.on(Events.STARTED)
+    def start_training(engine):
+        engine.state.epoch = start_epoch
+
+    @trainer.on(Events.EPOCH_STARTED)
+    def adjust_learning_rate(engine):
+        scheduler.step()
+
+    @trainer.on(Events.ITERATION_COMPLETED)
+    def log_training_loss(engine):
+        global ITER
+        ITER += 1
+
+        if ITER % log_period == 0:
+            logger.info("Epoch[{}] Iteration[{}/{}] Loss: {:.3f}, Acc: {:.3f}, Base Lr: {:.2e}"
+                        .format(engine.state.epoch, ITER, len(train_loader),
+                                engine.state.metrics['avg_loss'], engine.state.metrics['avg_acc'],
+                                scheduler.get_lr()[0]))
+        if len(train_loader) == ITER:
+            ITER = 0
+
+    # adding handlers using `trainer.on` decorator API
+    @trainer.on(Events.EPOCH_COMPLETED)
+    def print_times(engine):
+        logger.info('Epoch {} done. Time per batch: {:.3f}[s] Speed: {:.1f}[samples/s]'
+                    .format(engine.state.epoch, timer.value() * timer.step_count,
+                            train_loader.batch_size / timer.value()))
+        logger.info('-' * 10)
+        timer.reset()
+
+    @trainer.on(Events.EPOCH_COMPLETED)
+    def log_validation_results(engine):
+        if engine.state.epoch % eval_period == 0:
+            print('Trainer eval')
+            evaluator.run(val_loader)
+            cmc, mAP, _, _, _, _, _ = evaluator.state.metrics['r1_mAP']
+            logger.info(
+                "Validation Results - Epoch: {}".format(engine.state.epoch))
+            logger.info("mAP: {:.1%}".format(mAP))
+            for r in [1, 5, 10]:
+                logger.info(
+                    "CMC curve, Rank-{:<3}:{:.1%}".format(r, cmc[r - 1]))
+
+    trainer.run(train_loader, max_epochs=epochs)
+
+def do_oneshot_train(
         config,
         model,
         train_loader,
@@ -392,6 +376,225 @@ def do_train(
                     "CMC curve, Rank-{:<3}:{:.1%}".format(r, cmc[r - 1]))
 
         scheduler.step()
+
+def do_train_with_center(
+        config,
+        model,
+        center_criterion,
+        train_loader,
+        val_loader,
+        optimizer,
+        optimizer_center,
+        scheduler,
+        loss_fn,
+        num_query,
+        start_epoch
+):
+    log_period = config.log_period
+    checkpoint_period = config.checkpoint_period
+    eval_period = config.eval_period
+    output_dir = config.output_dir
+    device = config.device
+    epochs = config.num_epochs
+
+    logger = logging.getLogger("reid_baseline.train")
+    logger.info("Start training")
+    trainer = create_supervised_trainer_with_center(
+        config, model, center_criterion, optimizer, optimizer_center, loss_fn, config.center_loss_weight, device=device)
+    evaluator = create_supervised_evaluator(model, metrics={'r1_mAP': R1_mAP(
+        num_query, max_rank=50, feat_norm=config.test_feat_norm)}, device=device)
+    checkpointer = ModelCheckpoint(
+        output_dir, config.model_name, checkpoint_period, n_saved=10, require_empty=False)
+    timer = Timer(average=True)
+
+    trainer.add_event_handler(Events.EPOCH_COMPLETED, checkpointer, {'model': model,
+                                                                     'optimizer': optimizer,
+                                                                     'center_param': center_criterion,
+                                                                     'optimizer_center': optimizer_center})
+
+    timer.attach(trainer, start=Events.EPOCH_STARTED, resume=Events.ITERATION_STARTED,
+                 pause=Events.ITERATION_COMPLETED, step=Events.ITERATION_COMPLETED)
+
+    # average metric to attach on trainer
+    RunningAverage(output_transform=lambda x: x[0]).attach(trainer, 'avg_loss')
+    RunningAverage(output_transform=lambda x: x[1]).attach(trainer, 'avg_acc')
+
+    @trainer.on(Events.STARTED)
+    def start_training(engine):
+        engine.state.epoch = start_epoch
+
+    @trainer.on(Events.EPOCH_STARTED)
+    def adjust_learning_rate(engine):
+        scheduler.step()
+
+    @trainer.on(Events.ITERATION_COMPLETED)
+    def log_training_loss(engine):
+        global ITER
+        ITER += 1
+
+        if ITER % log_period == 0:
+            logger.info("Epoch[{}] Iteration[{}/{}] Loss: {:.3f}, Acc: {:.3f}, Base Lr: {:.2e}"
+                        .format(engine.state.epoch, ITER, len(train_loader),
+                                engine.state.metrics['avg_loss'], engine.state.metrics['avg_acc'],
+                                scheduler.get_lr()[0]))
+        if len(train_loader) == ITER:
+            ITER = 0
+
+    # adding handlers using `trainer.on` decorator API
+    @trainer.on(Events.EPOCH_COMPLETED)
+    def print_times(engine):
+        logger.info('Epoch {} done. Time per batch: {:.3f}[s] Speed: {:.1f}[samples/s]'
+                    .format(engine.state.epoch, timer.value() * timer.step_count,
+                            train_loader.batch_size / timer.value()))
+        logger.info('-' * 10)
+        timer.reset()
+
+    @trainer.on(Events.EPOCH_COMPLETED)
+    def log_validation_results(engine):
+        if engine.state.epoch % eval_period == 0:
+            evaluator.run(val_loader)
+            cmc, mAP, _ , _, _ , _, _ = evaluator.state.metrics['r1_mAP']
+            logger.info(
+                "Validation Results - Epoch: {}".format(engine.state.epoch))
+            logger.info("mAP: {:.1%}".format(mAP))
+            for r in [1, 5, 10]:
+                logger.info(
+                    "CMC curve, Rank-{:<3}:{:.1%}".format(r, cmc[r - 1]))
+
+    trainer.run(train_loader, max_epochs=epochs)
+
+def do_oneshot_train_with_center(
+        config,
+        model,
+        center_criterion,
+        train_loader,
+        val_loader,
+        optimizer,
+        optimizer_center,
+        scheduler,
+        loss_fn,
+        num_query,
+        start_epoch,
+        dataset_reference,
+        train_loader_reference,
+        num_classes
+):
+    log_period = config.log_period
+    checkpoint_period = config.checkpoint_period
+    eval_period = config.eval_period
+    output_dir = config.output_dir
+    device = config.device
+    epochs = config.num_epochs
+    timer = Timer(average=True)
+    logger = logging.getLogger("reid_baseline.train")
+    logger.info("Start training")
+
+    top = int(start_epoch/40) # the choose of the nearest sample
+    top_update = start_epoch # the first iteration train 80 steps and the following train 40
+
+    # Train and test
+    for epoch in range(start_epoch, epochs):
+        # get nearest samples and reset the model
+        if top_update < 80:
+            train_step = 80
+        else:
+            train_step = 40
+        if top_update % train_step == 0:
+            print("top: ", top)
+            A, path_labeled = PSP(model, train_loader_reference, train_loader, top, config)
+            top += 1
+            model = Backbone(num_classes=num_classes, model_name=config.model_name, model_path=config.pretrain_path, pretrain_choice=config.pretrain_choice, attr_lens=config.attr_lens).to(config.device)
+            optimizer = get_lr_policy(config.lr_policy, model)
+            scheduler = WarmupMultiStepLR(optimizer, config.steps, config.gamma, config.warmup_factor,
+                                      config.warmup_iters, config.warmup_method)
+            A_store = A.clone()
+        top_update += 1
+
+        for data in tqdm(train_loader, desc='Iteration', leave=False):
+            model.train()
+            global ITER
+            ITER += 1
+            images, labels_batch, img_path, attrs = data
+            index, index_labeled = find_index_by_path(img_path, dataset_reference.train, path_labeled)
+            images_relevant, GCN_index, choose_from_nodes, labels = load_relevant(config, dataset_reference.train, index, A_store, labels_batch, index_labeled)
+            # if device:
+            model.to(device)
+            images = images_relevant.to(device)
+
+            scores, feat, attr = model(images)
+            del images
+            loss = loss_fn(scores, feat, labels.to(device), choose_from_nodes, attr)
+
+            if len(config.attr_lens) != 0:
+                attrs = [a[0].cuda() for a in attrs]
+                attr_criter = BCEWithLogitsLoss()
+                attr_loss = attr_criter(attr[0][0], attrs[0])
+                for i in range(1, len(attrs)):
+                    attr_loss += attr_criter(attr[0][i], attrs[i])
+                loss += attr_loss
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            for param in center_criterion.parameters():
+                param.grad.data *= (1. / config.center_loss_weight)
+            optimizer_center.step()
+
+            acc = (scores[choose_from_nodes].max(1)[1].cpu() == labels_batch).float().mean()
+            if ITER % log_period == 0:
+                logger.info("Epoch[{}] Iteration[{}/{}] Loss: {:.3f}, Acc: {:.3f}, Base Lr: {:.2e}"
+                        .format(epoch+1, ITER, len(train_loader),
+                                loss.item(), acc.item(),
+                                scheduler.get_lr()[0]))
+            if len(train_loader) == ITER:
+                ITER = 0
+
+        logger.info('Epoch {} done. Time per batch: {:.3f}[s] Speed: {:.1f}[samples/s]'
+                    .format(epoch+1, timer.value() * timer.step_count,
+                            train_loader.batch_size / timer.value()))
+        logger.info('-' * 10)
+        timer.reset()
+
+        if (epoch+1) % checkpoint_period == 0:
+            model_name = f'resnet50_ibn_a_model_{epoch+1}'
+            optimizer_name = f'resnet50_ibn_a_optimizer_{epoch+1}'
+            center_param_name = f'resnet50_ibn_a_center_param_{epoch+1}'
+            optimizer_center_name = f'resnet50_ibn_a_optimizer_center_{epoch+1}'
+            torch.save(model, os.path.join(output_dir, model_name)+".pth")
+            torch.save(optimizer, os.path.join(output_dir, optimizer_name)+".pth")
+            torch.save(center_criterion, os.path.join(output_dir, center_param_name)+".pth")
+            torch.save(optimizer_center, os.path.join(output_dir, optimizer_center_name)+".pth")
+
+        # Validation
+        if (epoch+1) % eval_period == 0:
+            print('Trainer eval')
+            all_feats = []
+            all_pids = []
+            all_camids = []
+            for data in tqdm(val_loader, desc='Feature Extraction', leave=False):
+                model.eval()
+                with torch.no_grad():
+                    images, pids, camids, _ = data
+
+                    model.to(device)
+                    images = images.to(device)
+
+                    feats, _ = model(images)
+                    del images
+                all_feats.append(feats.cpu())
+                all_pids.extend(np.asarray(pids))
+                all_camids.extend(np.asarray(camids))
+
+            cmc, mAP = evaluation(all_feats, all_pids, all_camids, num_query, rr=config.test_reranking)
+            logger.info(
+                "Validation Results - Epoch: {}".format(epoch+1))
+            logger.info("mAP: {:.1%}".format(mAP))
+            for r in [1, 5, 10]:
+                logger.info(
+                    "CMC curve, Rank-{:<3}:{:.1%}".format(r, cmc[r - 1]))
+
+        scheduler.step()
+
 
 def PSP(model, train_loader, train_loader_orig, top, cfg):
     vis = len(train_loader_orig.dataset)
@@ -703,88 +906,115 @@ def evaluation(all_feats, all_pids, all_camids, num_query, rr=False, max_rank=50
 
     return all_cmc, mAP
 
-def do_train_with_center(
-        config,
-        model,
-        center_criterion,
-        train_loader,
-        val_loader,
-        optimizer,
-        optimizer_center,
-        scheduler,
-        loss_fn,
-        num_query,
-        start_epoch
-):
-    log_period = config.log_period
-    checkpoint_period = config.checkpoint_period
-    eval_period = config.eval_period
-    output_dir = config.output_dir
-    device = config.device
-    epochs = config.num_epochs
+class _Loss(Module):
+    reduction: str
 
-    logger = logging.getLogger("reid_baseline.train")
-    logger.info("Start training")
-    trainer = create_supervised_trainer_with_center(
-        config, model, center_criterion, optimizer, optimizer_center, loss_fn, config.center_loss_weight, device=device)
-    evaluator = create_supervised_evaluator(model, metrics={'r1_mAP': R1_mAP(
-        num_query, max_rank=50, feat_norm=config.test_feat_norm)}, device=device)
-    checkpointer = ModelCheckpoint(
-        output_dir, config.model_name, checkpoint_period, n_saved=10, require_empty=False)
-    timer = Timer(average=True)
+    def __init__(self, size_average=None, reduce=None, reduction: str = 'mean') -> None:
+        super(_Loss, self).__init__()
+        if size_average is not None or reduce is not None:
+            self.reduction: str = _Reduction.legacy_get_string(size_average, reduce)
+        else:
+            self.reduction = reduction
 
-    trainer.add_event_handler(Events.EPOCH_COMPLETED, checkpointer, {'model': model,
-                                                                     'optimizer': optimizer,
-                                                                     'center_param': center_criterion,
-                                                                     'optimizer_center': optimizer_center})
+class BCEWithLogitsLoss(_Loss):
+    r"""This loss combines a `Sigmoid` layer and the `BCELoss` in one single
+    class. This version is more numerically stable than using a plain `Sigmoid`
+    followed by a `BCELoss` as, by combining the operations into one layer,
+    we take advantage of the log-sum-exp trick for numerical stability.
 
-    timer.attach(trainer, start=Events.EPOCH_STARTED, resume=Events.ITERATION_STARTED,
-                 pause=Events.ITERATION_COMPLETED, step=Events.ITERATION_COMPLETED)
+    The unreduced (i.e. with :attr:`reduction` set to ``'none'``) loss can be described as:
 
-    # average metric to attach on trainer
-    RunningAverage(output_transform=lambda x: x[0]).attach(trainer, 'avg_loss')
-    RunningAverage(output_transform=lambda x: x[1]).attach(trainer, 'avg_acc')
+    .. math::
+        \ell(x, y) = L = \{l_1,\dots,l_N\}^\top, \quad
+        l_n = - w_n \left[ y_n \cdot \log \sigma(x_n)
+        + (1 - y_n) \cdot \log (1 - \sigma(x_n)) \right],
 
-    @trainer.on(Events.STARTED)
-    def start_training(engine):
-        engine.state.epoch = start_epoch
+    where :math:`N` is the batch size. If :attr:`reduction` is not ``'none'``
+    (default ``'mean'``), then
 
-    @trainer.on(Events.EPOCH_STARTED)
-    def adjust_learning_rate(engine):
-        scheduler.step()
+    .. math::
+        \ell(x, y) = \begin{cases}
+            \operatorname{mean}(L), & \text{if reduction} = \text{`mean';}\\
+            \operatorname{sum}(L),  & \text{if reduction} = \text{`sum'.}
+        \end{cases}
 
-    @trainer.on(Events.ITERATION_COMPLETED)
-    def log_training_loss(engine):
-        global ITER
-        ITER += 1
+    This is used for measuring the error of a reconstruction in for example
+    an auto-encoder. Note that the targets `t[i]` should be numbers
+    between 0 and 1.
 
-        if ITER % log_period == 0:
-            logger.info("Epoch[{}] Iteration[{}/{}] Loss: {:.3f}, Acc: {:.3f}, Base Lr: {:.2e}"
-                        .format(engine.state.epoch, ITER, len(train_loader),
-                                engine.state.metrics['avg_loss'], engine.state.metrics['avg_acc'],
-                                scheduler.get_lr()[0]))
-        if len(train_loader) == ITER:
-            ITER = 0
+    It's possible to trade off recall and precision by adding weights to positive examples.
+    In the case of multi-label classification the loss can be described as:
 
-    # adding handlers using `trainer.on` decorator API
-    @trainer.on(Events.EPOCH_COMPLETED)
-    def print_times(engine):
-        logger.info('Epoch {} done. Time per batch: {:.3f}[s] Speed: {:.1f}[samples/s]'
-                    .format(engine.state.epoch, timer.value() * timer.step_count,
-                            train_loader.batch_size / timer.value()))
-        logger.info('-' * 10)
-        timer.reset()
+    .. math::
+        \ell_c(x, y) = L_c = \{l_{1,c},\dots,l_{N,c}\}^\top, \quad
+        l_{n,c} = - w_{n,c} \left[ p_c y_{n,c} \cdot \log \sigma(x_{n,c})
+        + (1 - y_{n,c}) \cdot \log (1 - \sigma(x_{n,c})) \right],
 
-    @trainer.on(Events.EPOCH_COMPLETED)
-    def log_validation_results(engine):
-        if engine.state.epoch % eval_period == 0:
-            evaluator.run(val_loader)
-            cmc, mAP, _ , _, _ , _, _ = evaluator.state.metrics['r1_mAP']
-            logger.info(
-                "Validation Results - Epoch: {}".format(engine.state.epoch))
-            logger.info("mAP: {:.1%}".format(mAP))
-            for r in [1, 5, 10]:
-                logger.info(
-                    "CMC curve, Rank-{:<3}:{:.1%}".format(r, cmc[r - 1]))
+    where :math:`c` is the class number (:math:`c > 1` for multi-label binary classification,
+    :math:`c = 1` for single-label binary classification),
+    :math:`n` is the number of the sample in the batch and
+    :math:`p_c` is the weight of the positive answer for the class :math:`c`.
 
-    trainer.run(train_loader, max_epochs=epochs)
+    :math:`p_c > 1` increases the recall, :math:`p_c < 1` increases the precision.
+
+    For example, if a dataset contains 100 positive and 300 negative examples of a single class,
+    then `pos_weight` for the class should be equal to :math:`\frac{300}{100}=3`.
+    The loss would act as if the dataset contains :math:`3\times 100=300` positive examples.
+
+    Examples::
+
+        >>> target = torch.ones([10, 64], dtype=torch.float32)  # 64 classes, batch size = 10
+        >>> output = torch.full([10, 64], 1.5)  # A prediction (logit)
+        >>> pos_weight = torch.ones([64])  # All weights are equal to 1
+        >>> criterion = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+        >>> criterion(output, target)  # -log(sigmoid(1.5))
+        tensor(0.2014)
+
+    Args:
+        weight (Tensor, optional): a manual rescaling weight given to the loss
+            of each batch element. If given, has to be a Tensor of size `nbatch`.
+        size_average (bool, optional): Deprecated (see :attr:`reduction`). By default,
+            the losses are averaged over each loss element in the batch. Note that for
+            some losses, there are multiple elements per sample. If the field :attr:`size_average`
+            is set to ``False``, the losses are instead summed for each minibatch. Ignored
+            when :attr:`reduce` is ``False``. Default: ``True``
+        reduce (bool, optional): Deprecated (see :attr:`reduction`). By default, the
+            losses are averaged or summed over observations for each minibatch depending
+            on :attr:`size_average`. When :attr:`reduce` is ``False``, returns a loss per
+            batch element instead and ignores :attr:`size_average`. Default: ``True``
+        reduction (string, optional): Specifies the reduction to apply to the output:
+            ``'none'`` | ``'mean'`` | ``'sum'``. ``'none'``: no reduction will be applied,
+            ``'mean'``: the sum of the output will be divided by the number of
+            elements in the output, ``'sum'``: the output will be summed. Note: :attr:`size_average`
+            and :attr:`reduce` are in the process of being deprecated, and in the meantime,
+            specifying either of those two args will override :attr:`reduction`. Default: ``'mean'``
+        pos_weight (Tensor, optional): a weight of positive examples.
+                Must be a vector with length equal to the number of classes.
+
+    Shape:
+        - Input: :math:`(*)`, where :math:`*` means any number of dimensions.
+        - Target: :math:`(*)`, same shape as the input.
+        - Output: scalar. If :attr:`reduction` is ``'none'``, then :math:`(*)`, same
+          shape as input.
+
+     Examples::
+
+        >>> loss = nn.BCEWithLogitsLoss()
+        >>> input = torch.randn(3, requires_grad=True)
+        >>> target = torch.empty(3).random_(2)
+        >>> output = loss(input, target)
+        >>> output.backward()
+    """
+    def __init__(self, weight: Optional[Tensor] = None, size_average=None, reduce=None, reduction: str = 'mean',
+                 pos_weight: Optional[Tensor] = None) -> None:
+        super(BCEWithLogitsLoss, self).__init__(size_average, reduce, reduction)
+        self.register_buffer('weight', weight)
+        self.register_buffer('pos_weight', pos_weight)
+        self.weight: Optional[Tensor]
+        self.pos_weight: Optional[Tensor]
+
+    def forward(self, input: Tensor, target: Tensor) -> Tensor:
+        return F.binary_cross_entropy_with_logits(input, target,
+                                                  self.weight,
+                                                  pos_weight=self.pos_weight,
+                                                  reduction=self.reduction)
