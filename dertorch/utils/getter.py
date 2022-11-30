@@ -174,8 +174,25 @@ def get_dataset_and_dataloader(config):
     dataset = init_dataset(config.dataset_names,
                            root=config.root_dir)
 
+    train_set = ImageDataset(dataset.train, train_transforms, config.closed)
+
+    if config.closed:
+        train_loader = DataLoader(
+            train_set, batch_size=config.batch_size, 
+            # sampler=RandomIdentitySampler(
+            #     dataset.train, config.batch_size, config.num_instance),
+            shuffle=True, 
+            num_workers=config.num_workers, collate_fn=train_close_collate_fn)
+        
+        val_set = ImageDataset(dataset.val, val_transforms, config.closed)
+        val_loader = DataLoader(
+            val_set, batch_size=config.batch_size * 2, shuffle=False, num_workers=config.num_workers,
+            collate_fn=val_close_collate_fn
+        )
+        return train_loader, val_loader, None, None
+
+    
     num_classes = dataset.num_train_pids
-    train_set = ImageDataset(dataset.train, train_transforms)
 
     if config.sampler == 'softmax':
         train_loader = DataLoader(

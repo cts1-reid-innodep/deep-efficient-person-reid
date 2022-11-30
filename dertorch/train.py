@@ -14,8 +14,9 @@ def train(config):
     # prepare dataset
     train_loader, val_loader, num_query, num_classes = get_dataset_and_dataloader(
         config)
-
+ 
     # prepare model
+    
     model = Backbone(num_classes=num_classes, model_name=config.model_name, model_path=config.pretrain_path, pretrain_choice=config.pretrain_choice).to(config.device)
 
     if config.if_with_center == 'no':
@@ -89,6 +90,11 @@ def train(config):
                 torch.load(path_to_optimizer_center).state_dict())
             scheduler = WarmupMultiStepLR(optimizer, config.steps, config.gamma, config.warmup_factor,
                                           config.warmup_iters, config.warmup_method, start_epoch)
+        
+        elif config.pretrain_choice == 'pretrain':
+            ckpt = torch.load(config.pretrain_path).state_dict()
+            model.load_state_dict(ckpt, strict=False)
+
 
         do_train_with_center(
             config,
@@ -108,7 +114,10 @@ def train(config):
             config.if_with_center))
 
     torch.cuda.empty_cache()
-    del model, optimizer, scheduler, train_loader, val_loader, loss_func, optimizer_center
+    
+    if config.if_with_center == 'yes':
+        del optimizer_center
+    del model, optimizer, scheduler, train_loader, val_loader, loss_func
     gc.collect()
 
 def main():
