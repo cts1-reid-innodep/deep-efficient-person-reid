@@ -20,17 +20,19 @@ def create_supervised_closed_trainer(config, model, optimizer, loss_fn,
 
     def _update(engine, batch):
         model.train()
-        img, pid, top, bot = batch
+        img, pid, gender, top, bot = batch
         img = img.to(device) if torch.cuda.device_count() >= 1 else img
         # TODO: handle dynamic multi target
         pid = pid.to( 
             device) if torch.cuda.device_count() >= 1 else pid
+        gender = gender.to( 
+            device) if torch.cuda.device_count() >= 1 else gender
         top = top.to( 
             device) if torch.cuda.device_count() >= 1 else top
         bot = bot.to( 
             device) if torch.cuda.device_count() >= 1 else bot
         
-        targets = (pid, top, bot)
+        targets = (pid, gender, top, bot)
         scores, feat = model(img)   
 
         with torch.cuda.amp.autocast(enabled=config.mixed_precision):
@@ -49,10 +51,10 @@ def create_supervised_closed_trainer(config, model, optimizer, loss_fn,
 
         # compute acc
         acc_pid = (scores[0].max(1)[1] == targets[0]).float().mean()
-        acc_top = (scores[1].max(1)[1] == targets[1]).float().mean()
-        acc_bot = (scores[2].max(1)[1] == targets[2]).float().mean()
-        acc_mean = (acc_pid + acc_top + acc_bot) / 3
-        return loss.item(), acc_mean.item(), acc_pid.item(), acc_top.item(), acc_bot.item()
+        acc_gender = (scores[1].max(1)[1] == targets[1]).float().mean()
+        acc_top = (scores[2].max(1)[1] == targets[2]).float().mean()
+        acc_bot = (scores[3].max(1)[1] == targets[3]).float().mean()
+        return loss.item(), acc_pid.item(), acc_gender.item(), acc_top.item(), acc_bot.item()
 
     return Engine(_update)       
 
@@ -66,17 +68,19 @@ def create_supervised_closed_trainer_with_center(config, model, center_criterion
 
     def _update(engine, batch):
         model.train()
-        img, pid, top, bot = batch
+        img, pid, gender, top, bot = batch
         img = img.to(device) if torch.cuda.device_count() >= 1 else img
         # TODO: handle dynamic multi target
         pid = pid.to( 
             device) if torch.cuda.device_count() >= 1 else pid
+        gender = gender.to( 
+            device) if torch.cuda.device_count() >= 1 else gender
         top = top.to( 
             device) if torch.cuda.device_count() >= 1 else top
         bot = bot.to( 
             device) if torch.cuda.device_count() >= 1 else bot
         
-        targets = (pid, top, bot)
+        targets = (pid, gender, top, bot)
         scores, feat = model(img)   
 
         with torch.cuda.amp.autocast(enabled=config.mixed_precision):
@@ -103,10 +107,10 @@ def create_supervised_closed_trainer_with_center(config, model, center_criterion
 
         # compute acc
         acc_pid = (scores[0].max(1)[1] == targets[0]).float().mean()
-        acc_top = (scores[1].max(1)[1] == targets[1]).float().mean()
-        acc_bot = (scores[2].max(1)[1] == targets[2]).float().mean()
-        acc_mean = (acc_pid + acc_top + acc_bot) / 3
-        return loss.item(), acc_mean.item(), acc_pid.item(), acc_top.item(), acc_bot.item()
+        acc_gender = (scores[1].max(1)[1] == targets[1]).float().mean()
+        acc_top = (scores[2].max(1)[1] == targets[2]).float().mean()
+        acc_bot = (scores[3].max(1)[1] == targets[3]).float().mean()
+        return loss.item(), acc_pid.item(), acc_gender.item(), acc_top.item(), acc_bot.item()
 
     return Engine(_update)  
 
@@ -300,8 +304,8 @@ def do_train_closed(
 
     # average metric to attach on trainer
     RunningAverage(output_transform=lambda x: x[0]).attach(trainer, 'avg_loss')
-    RunningAverage(output_transform=lambda x: x[1]).attach(trainer, 'avg_acc')
-    RunningAverage(output_transform=lambda x: x[2]).attach(trainer, 'pid_acc')
+    RunningAverage(output_transform=lambda x: x[1]).attach(trainer, 'pid_acc')
+    RunningAverage(output_transform=lambda x: x[2]).attach(trainer, 'gender_acc')
     RunningAverage(output_transform=lambda x: x[3]).attach(trainer, 'top_acc')
     RunningAverage(output_transform=lambda x: x[4]).attach(trainer, 'bot_acc')
 
@@ -319,9 +323,9 @@ def do_train_closed(
         ITER += 1
 
         if ITER % log_period == 0:
-            logger.info("Epoch[{}] Iteration[{}/{}] Loss: {:.3f}, mean_Acc: {:.3f}, pid_Acc: {:.3f}, top_Acc: {:.3f}, bot_Acc: {:.3f}, Base Lr: {:.2e}"
+            logger.info("Epoch[{}] Iteration[{}/{}] Loss: {:.3f}, pid_Acc: {:.3f}, gender_Acc: {:.3f}, top_Acc: {:.3f}, bot_Acc: {:.3f}, Base Lr: {:.2e}"
                         .format(engine.state.epoch, ITER, len(train_loader),
-                                engine.state.metrics['avg_loss'], engine.state.metrics['avg_acc'], engine.state.metrics['pid_acc'],engine.state.metrics['top_acc'],engine.state.metrics['bot_acc'],
+                                engine.state.metrics['avg_loss'], engine.state.metrics['pid_acc'], engine.state.metrics['gender_acc'],engine.state.metrics['top_acc'],engine.state.metrics['bot_acc'],
                                 scheduler.get_lr()[0]))
         if len(train_loader) == ITER:
             ITER = 0
@@ -391,8 +395,8 @@ def do_train_closed_with_center(
 
     # average metric to attach on trainer
     RunningAverage(output_transform=lambda x: x[0]).attach(trainer, 'avg_loss')
-    RunningAverage(output_transform=lambda x: x[1]).attach(trainer, 'avg_acc')
-    RunningAverage(output_transform=lambda x: x[2]).attach(trainer, 'pid_acc')
+    RunningAverage(output_transform=lambda x: x[1]).attach(trainer, 'pid_acc')
+    RunningAverage(output_transform=lambda x: x[2]).attach(trainer, 'gender_acc')
     RunningAverage(output_transform=lambda x: x[3]).attach(trainer, 'top_acc')
     RunningAverage(output_transform=lambda x: x[4]).attach(trainer, 'bot_acc')
 
@@ -410,9 +414,9 @@ def do_train_closed_with_center(
         ITER += 1
 
         if ITER % log_period == 0:
-            logger.info("Epoch[{}] Iteration[{}/{}] Loss: {:.3f}, mean_Acc: {:.3f}, pid_Acc: {:.3f}, top_Acc: {:.3f}, bot_Acc: {:.3f}, Base Lr: {:.2e}"
+            logger.info("Epoch[{}] Iteration[{}/{}] Loss: {:.3f}, pid_Acc: {:.3f}, gender_Acc: {:.3f}, top_Acc: {:.3f}, bot_Acc: {:.3f}, Base Lr: {:.2e}"
                         .format(engine.state.epoch, ITER, len(train_loader),
-                                engine.state.metrics['avg_loss'], engine.state.metrics['avg_acc'], engine.state.metrics['pid_acc'],engine.state.metrics['top_acc'],engine.state.metrics['bot_acc'],
+                                engine.state.metrics['avg_loss'], engine.state.metrics['pid_acc'], engine.state.metrics['gender_acc'],engine.state.metrics['top_acc'],engine.state.metrics['bot_acc'],
                                 scheduler.get_lr()[0]))
         if len(train_loader) == ITER:
             ITER = 0

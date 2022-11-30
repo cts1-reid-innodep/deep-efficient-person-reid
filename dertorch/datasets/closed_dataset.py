@@ -19,8 +19,8 @@ class ClosedDataset:
         super(ClosedDataset, self).__init__()
         # self.dataset_dir = osp.join(root, '1105_medium_relabel.pickle')
 
-        self.train_dir = osp.join(root, '1117_train_relabel.pickle')
-        self.val_dir = osp.join(root, '1117_val.pickle')
+        self.train_dir = osp.join(root, '1122_market_train_fixed_relabel.pickle')
+        self.val_dir = osp.join(root, '1116_market_val.pickle')
 
         self.split_dir = osp.join(root, '1027_split.pickle')
 

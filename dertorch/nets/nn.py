@@ -172,6 +172,7 @@ class Backbone(nn.Module):
             self.classifier = nn.Linear(
                 self.in_planes, self.num_classes, bias=False)
 
+
             self.bottleneck.apply(weights_init_kaiming)
             self.classifier.apply(weights_init_classifier)
 

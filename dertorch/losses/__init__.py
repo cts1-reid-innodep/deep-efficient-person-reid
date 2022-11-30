@@ -110,6 +110,8 @@ def make_loss_closed(config, num_classes):    # modified by gu
             num_classes=num_classes[1]) 
         xent_2 = CrossEntropyLabelSmooth(
             num_classes=num_classes[2]) 
+        xent_3 = CrossEntropyLabelSmooth(
+            num_classes=num_classes[3]) 
         print("label smooth on, numclasses:", num_classes)
         if config.loss_type == 'triplet':
             def loss_func(scores, feat, targets):
@@ -119,8 +121,9 @@ def make_loss_closed(config, num_classes):    # modified by gu
             def loss_func(scores, feat, targets):
                 # 0.5 : 0.5
                 return xent_0(scores[0], targets[0]) \
+                + xent_1(scores[1], targets[1]) + xent_2(scores[2], targets[2]) + xent_3(scores[3], targets[3]) \
                 + triplet(feat, targets[0])[0] + config.center_loss_weight * center_criterion(feat, targets[0])
-                # + xent_1(scores[1], targets[1]) + xent_2(scores[2], targets[2]) \
+                
         else:
             def loss_func(scores, feat, targets):
                 # 0.5 : 0.5

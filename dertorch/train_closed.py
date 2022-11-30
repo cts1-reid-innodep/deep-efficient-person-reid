@@ -20,7 +20,7 @@ def train(config):
 
     # market
     # top_type 9, bot_type 10, pid 751
-    num_classes_list = [config.num_classes, config.top_type, config.bot_type]
+    num_classes_list = [config.num_classes, config.gender, config.top_type, config.bot_type]
     model = ClosedBackbone(num_classes_list=num_classes_list, model_name=config.model_name, model_path=config.pretrain_path, pretrain_choice=config.pretrain_choice).to(config.device)
 
 

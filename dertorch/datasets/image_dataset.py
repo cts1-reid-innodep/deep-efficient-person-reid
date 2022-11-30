@@ -38,8 +38,10 @@ class ImageDataset(Dataset):
 
             if self.transform is not None:
                 img = self.transform(img)
-
-            return img, data_dict['tops_type'], data_dict['bottoms_type']
+            if 'gender' in data_dict.keys():
+                return img, data_dict['pid'], data_dict['gender'], data_dict['tops_type'], data_dict['bottoms_type']
+            else:
+                return img, data_dict['pid'], data_dict['tops_type'], data_dict['bottoms_type']
         else:
             img_path, pid, camid = self.dataset[index]
             img = read_image(img_path)
