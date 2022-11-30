@@ -278,6 +278,9 @@ def do_oneshot_train(
     logger = logging.getLogger("reid_baseline.train")
     logger.info("Start training")
 
+    if torch.cuda.device_count() > 1:
+        model = torch.nn.DataParallel(model)
+
     top = int(start_epoch/40) # the choose of the nearest sample
     top_update = start_epoch # the first iteration train 80 steps and the following train 40
 
@@ -296,6 +299,8 @@ def do_oneshot_train(
             optimizer = get_lr_policy(config.lr_policy, model)
             scheduler = WarmupMultiStepLR(optimizer, config.steps, config.gamma, config.warmup_factor,
                                       config.warmup_iters, config.warmup_method)
+            if torch.cuda.device_count() > 1:
+                model = torch.nn.DataParallel(model)
             A_store = A.clone()
         top_update += 1
 
@@ -489,6 +494,9 @@ def do_oneshot_train_with_center(
     logger = logging.getLogger("reid_baseline.train")
     logger.info("Start training")
 
+    if torch.cuda.device_count() > 1:
+        model = torch.nn.DataParallel(model)
+
     top = int(start_epoch/40) # the choose of the nearest sample
     top_update = start_epoch # the first iteration train 80 steps and the following train 40
 
@@ -504,9 +512,12 @@ def do_oneshot_train_with_center(
             A, path_labeled = PSP(model, train_loader_reference, train_loader, top, config)
             top += 1
             model = Backbone(num_classes=num_classes, model_name=config.model_name, model_path=config.pretrain_path, pretrain_choice=config.pretrain_choice, attr_lens=config.attr_lens).to(config.device)
-            optimizer = get_lr_policy(config.lr_policy, model)
+            optimizer, optimizer_center = get_lr_policy_with_center(
+                config.lr_policy, model, center_criterion)
             scheduler = WarmupMultiStepLR(optimizer, config.steps, config.gamma, config.warmup_factor,
                                       config.warmup_iters, config.warmup_method)
+            if torch.cuda.device_count() > 1:
+                model = torch.nn.DataParallel(model)
             A_store = A.clone()
         top_update += 1
 
@@ -534,6 +545,7 @@ def do_oneshot_train_with_center(
                 loss += attr_loss
 
             optimizer.zero_grad()
+            optimizer_center.zero_grad()
             loss.backward()
             optimizer.step()
             for param in center_criterion.parameters():
@@ -777,6 +789,44 @@ def get_lr_policy(opt_config, model):
     optimizer = optimizer_name(optimizer_params)
 
     return optimizer
+
+def get_lr_policy_with_center(opt_config, model, center_criterion):
+    optimizer_params = []
+    center_lr = opt_config['center_lr'] if 'center_lr' in opt_config.keys() \
+        else None
+
+    if opt_config["name"] == 'sgd':
+        optimizer_name = SGD
+    elif opt_config["name"] == 'adam':
+        optimizer_name = AdamW
+
+    for key, value in model.named_parameters():
+        if not value.requires_grad:
+            continue
+        weight_decay = opt_config['weight_decay']
+        lr = opt_config['lr']
+
+        if "bias" in key:
+            lr = opt_config['lr'] * opt_config['bias_lr_factor']
+            weight_decay = opt_config['weight_decay_bias']
+
+        if opt_config["name"] == 'sgd':
+            optimizer_params += [{"params": [value], "lr": lr,
+                                  "weight_decay": weight_decay,
+                                  "momentum": opt_config['momentum'],
+                                  "nesterov": True}]
+
+        elif opt_config["name"] == 'adam':
+            optimizer_params += [{"params": [value], "lr": lr,
+                                  "weight_decay": weight_decay,
+                                  'betas': (opt_config['momentum'], 0.999), 'amsgrad': True}]
+
+    optimizer = optimizer_name(optimizer_params)
+
+    optimizer_center = AdamW(center_criterion.parameters(), lr=center_lr) if opt_config["name"] == 'adam' \
+        else SGD(center_criterion.parameters(), lr=center_lr)
+
+    return optimizer, optimizer_center
 
 class WarmupMultiStepLR(torch.optim.lr_scheduler._LRScheduler):
     def __init__(

@@ -280,6 +280,9 @@ class Backbone(nn.Module):
                 continue
             if 'multi_attr_recoger' in i:
                 continue
+            if 'module' in i:
+                self.state_dict()[i.replace('module.', '')].copy_(param_dict[i])
+                continue
             self.state_dict()[i].copy_(param_dict[i])
 
     
