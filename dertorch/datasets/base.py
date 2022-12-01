@@ -5,7 +5,7 @@ class BaseDataset:
 
     def get_imagedata_info(self, data):
         pids, cams = [], []
-        for _, pid, camid in data:
+        for _, pid, camid, _ in data:
             pids += [pid]
             cams += [camid]
         pids = set(pids)

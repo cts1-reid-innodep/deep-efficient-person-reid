@@ -46,7 +46,7 @@ if __name__ == "__main__":
     os.environ['CUDA_VISIBLE_DEVICES'] = config.gpu_devices
     cudnn.benchmark = True
 
-    model = Backbone(num_classes=255, model_name=config.model_name)
+    model = Backbone(num_classes=255, model_name=config.model_name, attr_lens=config.attr_lens)
     model.load_param(config.test_weight)
 
     model = model.to(config.device)
@@ -76,7 +76,7 @@ if __name__ == "__main__":
         input = torch.unsqueeze(transform(query_img), 0)
         input = input.to(config.device)
         with torch.no_grad():
-            query_feat = model(input)
+            query_feat, _ = model(input)
 
         dist_mat = cosine_similarity(query_feat, gallery_feats)
         indices = np.argsort(dist_mat, axis=1)

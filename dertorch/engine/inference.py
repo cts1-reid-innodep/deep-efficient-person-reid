@@ -81,10 +81,10 @@ def inference(
                         inv_idx = torch.arange(
                             img.size(3) - 1, -1, -1).long().cuda()
                         img = img.index_select(3, inv_idx)
-                    f = model(img)
+                    f, _ = model(img)
                     feat = feat + f
             else:
-                feat = model(img)
+                feat, _ = model(img)
             
             evaluator.update((feat, pid, camid))
             img_path_list.extend(imgpath)

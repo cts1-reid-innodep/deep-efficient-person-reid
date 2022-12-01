@@ -11,12 +11,20 @@ torch.backends.cudnn.fastest = True
 
 def train(config):
 
+    if config.oneshot_learning == 'yes':
+        train_transforms = build_transforms(config, is_train=True)
+        dataset_reference = init_dataset(config.dataset_names + '_origin',
+                            root=config.root_dir)
+        train_set_reference = ImageDataset(dataset_reference.train, train_transforms)
+        train_loader_reference = DataLoader(
+            train_set_reference, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=train_collate_fn)
+
     # prepare dataset
     train_loader, val_loader, num_query, num_classes = get_dataset_and_dataloader(
         config)
 
     # prepare model
-    model = Backbone(num_classes=num_classes, model_name=config.model_name, model_path=config.pretrain_path, pretrain_choice=config.pretrain_choice).to(config.device)
+    model = Backbone(num_classes=num_classes, model_name=config.model_name, model_path=config.pretrain_path, pretrain_choice=config.pretrain_choice, attr_lens=config.attr_lens).to(config.device)
 
     if config.if_with_center == 'no':
         print('Train without center loss, the loss type is',
@@ -41,18 +49,33 @@ def train(config):
             scheduler = WarmupMultiStepLR(optimizer, config.steps, config.gamma, config.warmup_factor,
                                           config.warmup_iters, config.warmup_method, start_epoch)
 
-
-        do_train(
-            config,
-            model,
-            train_loader,
-            val_loader,
-            optimizer,
-            scheduler,      # modify for using self trained model
-            loss_func,
-            num_query,
-            start_epoch     # add for using self trained model
-        )
+        if config.oneshot_learning == 'yes':
+            do_oneshot_train(
+                config,
+                model,
+                train_loader,
+                val_loader,
+                optimizer,
+                scheduler,      # modify for using self trained model
+                loss_func,
+                num_query,
+                start_epoch,     # add for using self trained model
+                dataset_reference,
+                train_loader_reference,
+                num_classes
+            )
+        else:
+            do_train(
+                config,
+                model,
+                train_loader,
+                val_loader,
+                optimizer,
+                scheduler,
+                loss_func,
+                num_query,
+                start_epoch
+            )
 
     elif config.if_with_center == 'yes':
         print('Train with center loss, the loss type is',
@@ -80,8 +103,8 @@ def train(config):
                 'model', 'optimizer_center')
             print('Path to the checkpoint of optimizer_center:',
                   path_to_optimizer_center)
-            # print('Model state dict: ', model.state_dict())
-            # print('model pretrain: ', torch.load(config.pretrain_path)._modules)
+            print('Model state dict: ', model.state_dict())
+            print('model pretrain: ', torch.load(config.pretrain_path)._modules)
             model.load_state_dict(torch.load(config.pretrain_path).state_dict())
             optimizer.load_state_dict(torch.load(path_to_optimizer).state_dict())
             center_criterion.load_state_dict(torch.load(path_to_center_param).state_dict())
@@ -90,25 +113,45 @@ def train(config):
             scheduler = WarmupMultiStepLR(optimizer, config.steps, config.gamma, config.warmup_factor,
                                           config.warmup_iters, config.warmup_method, start_epoch)
 
-        do_train_with_center(
-            config,
-            model,
-            center_criterion,
-            train_loader,
-            val_loader,
-            optimizer,
-            optimizer_center,
-            scheduler,      # modify for using self trained model
-            loss_func,
-            num_query,
-            start_epoch     # add for using self trained model
-        )
+        if config.oneshot_learning == 'yes':
+            do_oneshot_train_with_center(
+                config,
+                model,
+                center_criterion,
+                train_loader,
+                val_loader,
+                optimizer,
+                optimizer_center,
+                scheduler,
+                loss_func,
+                num_query,
+                start_epoch,
+                dataset_reference,
+                train_loader_reference,
+                num_classes
+            )
+        else:
+            do_train_with_center(
+                config,
+                model,
+                center_criterion,
+                train_loader,
+                val_loader,
+                optimizer,
+                optimizer_center,
+                scheduler,      # modify for using self trained model
+                loss_func,
+                num_query,
+                start_epoch     # add for using self trained model
+            )
     else:
         print("Unsupported value for config.MODEL.IF_WITH_CENTER {}, only support yes or no!\n".format(
             config.if_with_center))
 
     torch.cuda.empty_cache()
-    del model, optimizer, scheduler, train_loader, val_loader, loss_func, optimizer_center
+    del model, optimizer, scheduler, train_loader, val_loader, loss_func
+    if config.if_with_center == 'yes':
+        del optimizer_center
     gc.collect()
 
 def main():
