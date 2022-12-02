@@ -3,15 +3,15 @@ settings:
 
   dataset_names: "market1501" #['market1501', 'cuhk03']
   root_dir: "/home/snu1/datasets/market1501" #['market1501','cuhk03_release']
-  sampler: "softmax_triplet"
+  sampler: "softmax"
   seed: 2021
 
   #################   TRAINING CONFIG   ###################
 
   model_name: "resnet50_ibn_a" #[resnet50_ibn_a, resnet50]
 
-  gpu_devices: "0" # supports multi-gpus
-  batch_size: 32
+  gpu_devices: "1" # supports multi-gpus
+  batch_size: 16
   num_workers: 2
   num_instance: 2
 
@@ -40,20 +40,20 @@ settings:
 
   # Trainer
   log_period: 50
-  checkpoint_period: 1
-  eval_period: 1
-  output_dir: "./weights_resnet50_market_oneshot_attr_self"
+  checkpoint_period: 25
+  eval_period: 50
+  output_dir: "./weights_resnet50_market_attr_rerank_self"
   device: "cuda"
-  num_epochs: 2
+  num_epochs: 50
 
   # Test
   test_neck_feat: "after" # Which feature of BNNeck to be used for test, before or after BNNneck, options: 'before' or 'after'
   test_feat_norm: "yes" # Whether feature is nomalized before test, if yes, it is equivalent to cosine distance
-  test_reranking: "no" # yes, no
-  test_weight: "/home/snu1/kha/deep-efficient-person-reid/dertorch/weights_resnet50_market_oneshot_self/resnet50_ibn_a_model_30.pth"
+  test_reranking: "yes" # yes, no
+  test_weight: "/home/snu1/kha/deep-efficient-person-reid/dertorch/weights_resnet50_innodep_attr_rerank_self/resnet50_ibn_a_model_50.pth"
 
   flip_feats: "off" # on, off
-  log_dir: "loggers/runs/resnet50_market_oneshot"
+  log_dir: "loggers/runs/resnet50_market_threeshot"
   query_dir: "market1501/query"
   dist_mat: "dist_mat.npy"
   pids: "pids.npy"

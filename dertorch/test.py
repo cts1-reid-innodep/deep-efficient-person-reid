@@ -48,7 +48,7 @@ def main():
 
     train_loader, val_loader, num_query, num_classes = get_dataset_and_dataloader(
         config)
-    model = Backbone(num_classes=num_classes, model_name=config.model_name)
+    model = Backbone(num_classes=num_classes, model_name=config.model_name, attr_lens=config.attr_lens)
     model.load_param(config.test_weight)
 
     inference(config, model, val_loader, num_query)

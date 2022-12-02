@@ -125,7 +125,7 @@ class Market1501_Oneshot(BaseImageDataset):
     def __init__(self, root="/home/snu1/datasets/market1501", verbose=True, **kwargs):
         super(Market1501_Oneshot, self).__init__()
         self.dataset_dir = root
-        self.train_dir = osp.join(self.dataset_dir, 'bounding_box_train_query_one') #bounding_box_train_query_one_random
+        self.train_dir = osp.join(self.dataset_dir, 'bounding_box_train_query_three_shot') #bounding_box_train_query_one_random
         self.query_dir = osp.join(self.dataset_dir, 'query')
         self.gallery_dir = osp.join(self.dataset_dir, 'bounding_box_test')
         self.attributes_dir = "/home/snu1/datasets/market1501/attribute/market_attribute.mat"

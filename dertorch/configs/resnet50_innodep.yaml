@@ -1,8 +1,8 @@
 settings:
   #################   DATASET CONFIG   ###################
 
-  dataset_names: "aihub" #['market1501', 'cuhk03', 'aihub']
-  root_dir: "aihub_kor_dataset" #['market1501','cuhk03_release']
+  dataset_names: "innodep" #['market1501', 'cuhk03']
+  root_dir: "/home/snu1/innodep_reid" #['market1501','cuhk03_release']
   sampler: "softmax"
   seed: 2021
 
@@ -11,7 +11,7 @@ settings:
   model_name: "resnet50_ibn_a" #[resnet50_ibn_a, resnet50]
 
   gpu_devices: "0" # supports multi-gpus
-  batch_size: 64
+  batch_size: 16
   num_workers: 2
   num_instance: 2
 
@@ -22,10 +22,10 @@ settings:
   label_smooth: "on"
   margin: 0.3
   center_loss_weight: 0.0005
-  loss_type: "triplet_center" # triplet, center, triplet_center
-  oneshot_learning: "no"
+  loss_type: "triplet_center" # triplet, center, triplet_center, triplet_attr, triplet_center_attr
+  oneshot_learning: "no" # "yes", "no"
   if_with_center: "yes"
-  attr_lens: []
+  attr_lens: [] # [2, 2, 2], []
 
   # Transform
   prob: 0.5
@@ -35,16 +35,16 @@ settings:
   # Backbone details
   last_stride: 1
   neck: "bnneck"
-  pretrain_path: "weights_resnet50_market/weights-resnet50-market/resnet50_ibn_a_model_60.pth" # ./weights
+  pretrain_path: "/home/snu1/weights_resnet50_market/weights-resnet50-market/resnet50_ibn_a_model_60.pth" # ./weights
   pretrain_choice: "imagenet" # self, imagenet 
 
   # Trainer
-  log_period: 1
-  checkpoint_period: 1
-  eval_period: 1
-  output_dir: "./weights_resnet50_aihub_self"
+  log_period: 50
+  checkpoint_period: 25
+  eval_period: 50
+  output_dir: "./weights_resnet50_innodep_rerank_self"
   device: "cuda"
-  num_epochs: 5
+  num_epochs: 50
 
   # Test
   test_neck_feat: "after" # Which feature of BNNeck to be used for test, before or after BNNneck, options: 'before' or 'after'
@@ -53,8 +53,8 @@ settings:
   test_weight: "/home/snu1/kha/deep-efficient-person-reid/dertorch/weights_resnet50_innodep_attr_rerank_self/resnet50_ibn_a_model_50.pth"
 
   flip_feats: "off" # on, off
-  log_dir: "loggers/runs/resnet50_aihub_byinnodep_attr_rerank"
-  query_dir: "./aihub_kor_dataset/Validation/query_image"
+  log_dir: "loggers/runs/resnet50_innodep_rerank"
+  query_dir: "/home/snu1/innodep_reid/query"
   dist_mat: "dist_mat.npy"
   pids: "pids.npy"
   camids: "camids.npy"

@@ -6,6 +6,7 @@ import numpy as np
 
 from ignite.engine import Engine
 from metrics.mAP import R1_mAP, R1_mAP_reranking
+from tqdm import tqdm
 
 
 # def create_supervised_evaluator(model, metrics,
