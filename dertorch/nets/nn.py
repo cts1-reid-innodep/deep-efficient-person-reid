@@ -162,6 +162,7 @@ class Backbone(nn.Module):
         self.training = training
         self.model_name = model_name
 
+        
         if self.neck == 'no':
             self.classifier = nn.Linear(self.in_planes, self.num_classes)
             # self.classifier = nn.Linear(self.in_planes, self.num_classes, bias=False)
@@ -169,14 +170,15 @@ class Backbone(nn.Module):
         elif self.neck == 'bnneck':
             self.bottleneck = nn.BatchNorm1d(self.in_planes)
             self.bottleneck.bias.requires_grad_(False)  # no shift
-            self.classifier = nn.Linear(
-                self.in_planes, self.num_classes, bias=False)
+            
+            # self.classifiers = nn.ModuleList([nn.Linear(self.in_planes, num_classes) for num_classes in num_classes_list])
 
+            self.classifier = nn.Linear(self.in_planes, self.num_classes, bias=False)
+            
             self.bottleneck.apply(weights_init_kaiming)
             self.classifier.apply(weights_init_classifier)
 
     def forward(self, x):
-
         global_feat = self.gap(self.base(x))  # (b, in_planes, 1, 1)
         global_feat = global_feat.view(
             global_feat.shape[0], -1)  # flatten to (bs, in_planes)
@@ -186,6 +188,7 @@ class Backbone(nn.Module):
         elif self.neck == 'bnneck':
             # normalize for angular softmax
             feat = self.bottleneck(global_feat)
+            # cls_scores = [classifier(feat) for classifier in self.classifiers]
 
         if self.training:
             cls_score = self.classifier(feat)
@@ -204,5 +207,3 @@ class Backbone(nn.Module):
             if 'classifier' in i:
                 continue
             self.state_dict()[i].copy_(param_dict[i])
-
-    

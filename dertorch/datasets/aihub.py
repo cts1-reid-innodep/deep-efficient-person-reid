@@ -1,6 +1,7 @@
 import glob
 import re
 import os.path as osp
+import random
 
 from .base import BaseImageDataset
 
@@ -19,7 +20,7 @@ class AIHUB(BaseImageDataset):
 
         train = self._process_dir(self.train_dir, relabel=True)
         query = self._process_dir(self.query_dir, relabel=False)
-        gallery = self._process_dir(self.gallery_dir, relabel=False)
+        gallery = self._process_dir(self.gallery_dir, relabel=False, random_extract=False)
 
         if verbose:
             print("=> Aihub dataset loaded")
@@ -49,7 +50,7 @@ class AIHUB(BaseImageDataset):
             raise RuntimeError(
                 "'{}' is not available".format(self.gallery_dir))
 
-    def _process_dir(self, dir_path, relabel=False):
+    def _process_dir(self, dir_path, relabel=False, random_extract=False):
 
         img_paths = glob.glob(osp.join(dir_path, '*.png'))
 
@@ -80,6 +81,8 @@ class AIHUB(BaseImageDataset):
 
         dataset = []
         for img_path in img_paths:
+            if(random_extract and random.random() > 0.13) :
+                continue
             pid, cid, _ = map(int, pattern.search(img_path).groups())
             # if pid == -1:
             #     continue  # junk images are just ignored
@@ -89,6 +92,6 @@ class AIHUB(BaseImageDataset):
             if relabel:
                 pid = pid2label[pid]
                 cid = cid2label[cid]
-            dataset.append((img_path, pid, cid))
+            dataset.append((img_path, pid, cid, []))
 
         return dataset

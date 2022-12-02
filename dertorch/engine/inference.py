@@ -70,7 +70,7 @@ def inference(
     img_path_list = []
 
     print('Len val_loader: ', len(val_loader))
-    for i, (img, pid, camid, imgpath) in enumerate(val_loader):
+    for i, (img, pid, camid, imgpath, _ ) in enumerate(val_loader):
         with torch.no_grad():
             img = img.to(device)
 

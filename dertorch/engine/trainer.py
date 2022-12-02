@@ -11,7 +11,6 @@ from metrics.mAP import R1_mAP
 global ITER
 ITER = 0
 
-
 def create_supervised_trainer(config, model, optimizer, loss_fn,
                               device=None):
     """
@@ -72,15 +71,17 @@ def create_supervised_trainer_with_center(config, model, center_criterion, optim
         model.train()
         optimizer.zero_grad()
         optimizer_center.zero_grad()
-        img, target = batch
+        img, target, attr = batch
+        
         img = img.to(device) if torch.cuda.device_count() >= 1 else img
         target = target.to(
             device) if torch.cuda.device_count() >= 1 else target
         score, feat = model(img)
 
+
         with torch.cuda.amp.autocast(enabled=config.mixed_precision):
             amp_scale = torch.cuda.amp.GradScaler()
-            loss = loss_fn(score, feat, target)
+            loss = loss_fn(score, feat, target, attr)
             # print("Total loss is {}, center loss is {}".format(
             #     loss, center_criterion(feat, target)))
 
@@ -129,7 +130,7 @@ def create_supervised_evaluator(model, metrics,
     def inference(engine, batch):
         model.eval()
         with torch.no_grad():
-            data, pids, camids, _ = batch
+            data, pids, camids, _, _ = batch
             data = data.to(device) if torch.cuda.device_count() >= 1 else data
             feat = model(data)
 
@@ -254,6 +255,9 @@ def do_train_with_center(
         num_query, max_rank=50, feat_norm=config.test_feat_norm)}, device=device)
     checkpointer = ModelCheckpoint(
         output_dir, config.model_name, checkpoint_period, n_saved=10, require_empty=False)
+    print(output_dir)
+    print(config.model_name)
+    print(checkpoint_period)
     timer = Timer(average=True)
 
     trainer.add_event_handler(Events.EPOCH_COMPLETED, checkpointer, {'model': model,

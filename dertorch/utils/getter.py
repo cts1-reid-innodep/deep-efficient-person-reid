@@ -173,13 +173,14 @@ def get_dataset_and_dataloader(config):
 
     dataset = init_dataset(config.dataset_names,
                            root=config.root_dir)
+                           
 
     num_classes = dataset.num_train_pids
     train_set = ImageDataset(dataset.train, train_transforms)
 
     if config.sampler == 'softmax':
         train_loader = DataLoader(
-            train_set, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=train_collate_fn)
+            train_set, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=train_attr_collate_fn)
     else:
         train_loader = DataLoader(
             train_set, batch_size=config.batch_size,
@@ -192,7 +193,7 @@ def get_dataset_and_dataloader(config):
     val_set = ImageDataset(dataset.query + dataset.gallery, val_transforms)
     val_loader = DataLoader(
         val_set, batch_size=config.batch_size * 2, shuffle=False, num_workers=config.num_workers,
-        collate_fn=val_collate_fn
+        collate_fn=val_attr_collate_fn
     )
 
     return train_loader, val_loader, len(dataset.query), num_classes
