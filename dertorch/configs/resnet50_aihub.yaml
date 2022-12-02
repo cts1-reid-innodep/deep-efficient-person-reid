@@ -23,7 +23,6 @@ settings:
   margin: 0.3
   center_loss_weight: 0.0005
   loss_type: "triplet_center" # triplet, center, triplet_center
-  oneshot_learning: "no"
   if_with_center: "yes"
   attr_lens: []
 

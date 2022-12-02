@@ -5,10 +5,9 @@ from .innodep import *
 from .image_dataset import *
 
 __factory = {
-    'market1501_origin': Market1501,
+    'market1501': Market1501,
     'cuhk03': CUHK03,
     'aihub' : AIHUB,
-    'market1501': Market1501_Oneshot,
     'innodep': Innodep
 }
 
