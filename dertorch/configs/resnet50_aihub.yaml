@@ -5,6 +5,7 @@ settings:
   root_dir: "aihub_kor_dataset" #['market1501','cuhk03_release']
   sampler: "softmax"
   seed: 2021
+  attribute_multitask: "no"
 
   #################   TRAINING CONFIG   ###################
 
@@ -38,17 +39,18 @@ settings:
 
   # Trainer
   log_period: 1
-  checkpoint_period: 1
+  checkpoint_period: 2
   eval_period: 1
-  output_dir: "./weights_resnet50_aihub_self"
+  output_dir: "/home/snu1/hsj/deep-efficient-person-reid/dertorch/weights_resnet50_aihub_self_test"
   device: "cuda"
   num_epochs: 5
+
 
   # Test
   test_neck_feat: "after" # Which feature of BNNeck to be used for test, before or after BNNneck, options: 'before' or 'after'
   test_feat_norm: "yes" # Whether feature is nomalized before test, if yes, it is equivalent to cosine distance
   test_reranking: "no" # yes, no
-  test_weight: "/home/snu1/dongseok/deep-efficient-person-reid/dertorch/weights_resnet50_aihub_self/resnet50_ibn_a_model_3.pth"
+  test_weight: "/home/snu1/hsj/deep-efficient-person-reid/dertorch/weights_resnet50_market_self_test/resnet50_ibn_a_model_2.pth"
   # "/home/snu1/dongseok/deep-efficient-person-reid/dertorch/weights_resnet50_aihub_self/resnet50_ibn_a_model_3.pth"
 
   flip_feats: "off" # on, off
