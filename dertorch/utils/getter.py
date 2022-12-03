@@ -171,14 +171,28 @@ def get_dataset_and_dataloader(config):
     train_transforms = build_transforms(config, is_train=True)
     val_transforms = build_transforms(config, is_train=False)
 
-    dataset = init_dataset(config.dataset_names,
+    if config.attribute_multitask == "yes" :
+        dataset_name = config.dataset_names + "_attr"
+    else :
+        dataset_name = config.dataset_names
+    
+    dataset = init_dataset(dataset_name,
                            root=config.root_dir)
 
     num_classes = dataset.num_train_pids
-    train_set = ImageDataset(dataset.train, train_transforms)
+    
+    if config.attribute_multitask == "yes" :    
+        train_set = ImageDataset_attr(dataset.train, train_transforms)
+    else :
+        train_set = ImageDataset(dataset.train, train_transforms)
 
     if config.sampler == 'softmax':
-        train_loader = DataLoader(
+        if config.attribute_multitask == "yes":
+            train_loader = DataLoader(
+            train_set, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=train_attr_collate_fn)
+
+        else :
+            train_loader = DataLoader(
             train_set, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=train_collate_fn)
     else:
         train_loader = DataLoader(
@@ -189,10 +203,14 @@ def get_dataset_and_dataloader(config):
             num_workers=config.num_workers, collate_fn=train_collate_fn
         )
 
-    val_set = ImageDataset(dataset.query + dataset.gallery, val_transforms)
-    val_loader = DataLoader(
-        val_set, batch_size=config.batch_size * 2, shuffle=False, num_workers=config.num_workers,
-        collate_fn=val_collate_fn
-    )
+    if config.attribute_multitask == "yes":    
+        val_set = ImageDataset_attr(dataset.query + dataset.gallery, val_transforms)
+    else :
+        val_set = ImageDataset(dataset.query + dataset.gallery, val_transforms)
+    
+    if config.attribute_multitask == "yes":
+        val_loader = DataLoader(val_set, batch_size=config.batch_size * 2, shuffle=False, num_workers=config.num_workers, collate_fn=val_attr_collate_fn)
+    else :
+        val_loader = DataLoader(val_set, batch_size=config.batch_size * 2, shuffle=False, num_workers=config.num_workers, collate_fn=val_collate_fn)
 
     return train_loader, val_loader, len(dataset.query), num_classes

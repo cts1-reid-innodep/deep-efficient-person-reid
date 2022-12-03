@@ -68,7 +68,7 @@ def make_loss_with_center(config, num_classes):    # modified by gu
             num_classes=num_classes)     # new add by luo
         print("label smooth on, numclasses:", num_classes)
 
-    def loss_func(score, feat, target):
+    def loss_func(score, feat, target, attr = []):
         if config.loss_type == 'center':
             if config.label_smooth == 'on':
                 return xent(score, target) + \
@@ -81,17 +81,32 @@ def make_loss_with_center(config, num_classes):    # modified by gu
 
         elif config.loss_type == 'triplet_center':
             if config.label_smooth == 'on':
-                return xent(score, target) + \
-                    triplet(feat, target)[0] + \
-                    config.center_loss_weight * \
-                    center_criterion(feat, target)
+                if config.attribute_multitask == "yes" :
+                    return xent(score, target) + \
+                        triplet(feat, target)[0] + \
+                        config.center_loss_weight * \
+                        center_criterion(feat, target) + \
+                        attr_loss(feat, attr) / 3
+                        #attr
+                else :
+                    return xent(score, target) + \
+                        triplet(feat, target)[0] + \
+                        config.center_loss_weight * \
+                        center_criterion(feat, target)
+            
             else:
                 return F.cross_entropy(score, target) + \
                     triplet(feat, target)[0] + \
                     config.center_loss_weight * \
                     center_criterion(feat, target)
-
         else:
             print('expected METRIC_LOSS_TYPE with center should be center, triplet_center'
                   'but got {}'.format(config.loss_type))
+
+    def attr_loss(feat, attr) :
+        xent0 = CrossEntropyLabelSmooth(num_classes=2)
+        xent1 = CrossEntropyLabelSmooth(num_classes=8)
+        xent2 = CrossEntropyLabelSmooth(num_classes=9)
+        return xent0(feat, attr.t()[0]) + xent1(feat,attr.t()[1]) + xent2(feat,attr.t()[2])
+
     return loss_func, center_criterion

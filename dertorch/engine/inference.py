@@ -70,7 +70,11 @@ def inference(
     img_path_list = []
 
     print('Len val_loader: ', len(val_loader))
-    for i, (img, pid, camid, imgpath) in enumerate(val_loader):
+
+    #config로 바꿀 것
+
+    for i, batch in enumerate(val_loader):
+        img, pid, camid, imgpath = batch[0:4]
         with torch.no_grad():
             img = img.to(device)
 

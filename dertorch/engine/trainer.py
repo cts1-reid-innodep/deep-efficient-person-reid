@@ -72,7 +72,14 @@ def create_supervised_trainer_with_center(config, model, center_criterion, optim
         model.train()
         optimizer.zero_grad()
         optimizer_center.zero_grad()
-        img, target = batch
+        
+        # config에 따라
+        if config.attribute_multitask == "yes": 
+            img, target, attr = batch
+        else : 
+            img, target = batch
+        
+        
         img = img.to(device) if torch.cuda.device_count() >= 1 else img
         target = target.to(
             device) if torch.cuda.device_count() >= 1 else target
@@ -80,7 +87,10 @@ def create_supervised_trainer_with_center(config, model, center_criterion, optim
 
         with torch.cuda.amp.autocast(enabled=config.mixed_precision):
             amp_scale = torch.cuda.amp.GradScaler()
-            loss = loss_fn(score, feat, target)
+            if config.attribute_multitask == "yes" : 
+                loss = loss_fn(score, feat, target, attr)
+            else :
+                loss = loss_fn(score, feat, target)
             # print("Total loss is {}, center loss is {}".format(
             #     loss, center_criterion(feat, target)))
 
@@ -129,7 +139,7 @@ def create_supervised_evaluator(model, metrics,
     def inference(engine, batch):
         model.eval()
         with torch.no_grad():
-            data, pids, camids, _ = batch
+            data, pids, camids, _ = batch[0:4]
             data = data.to(device) if torch.cuda.device_count() >= 1 else data
             feat = model(data)
 

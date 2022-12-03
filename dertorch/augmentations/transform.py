@@ -105,10 +105,10 @@
 #         return val_transforms
 #     elif _type == 'test':
 #         return test_transforms
+
 import torchvision.transforms as T
 
 from .random_erasing import RandomErasing
-
 
 def build_transforms(config, is_train=True):
     normalize_transform = T.Normalize(
@@ -119,6 +119,8 @@ def build_transforms(config, is_train=True):
             T.RandomHorizontalFlip(p=config.prob),
             T.Pad(config.padding),
             T.RandomCrop(config.image_size),
+            T.RandomPerspective(p=0.5),
+            T.ColorJitter(brightness=0.5),
             T.ToTensor(),
             normalize_transform,
             RandomErasing(probability=config.re_prob,
